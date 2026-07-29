@@ -1,0 +1,8 @@
+sqlalchemy>=2.0.30
+pydantic>=2.7
+pydantic-settings>=2.3
+pandas>=2.2
+yfinance>=0.2.50
+anthropic>=0.40
+streamlit>=1.40
+plotly>=5.24

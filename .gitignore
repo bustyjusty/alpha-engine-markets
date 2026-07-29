@@ -1,0 +1,18 @@
+# Environments / secrets
+.env
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+
+# Local data
+data/
+logs/
+*.db
+*.sqlite3

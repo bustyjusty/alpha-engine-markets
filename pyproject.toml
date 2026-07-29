@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "market-intel"
+version = "0.1.0"
+description = "Market intelligence platform for discretionary event-driven investing"
+requires-python = ">=3.12"
+dependencies = [
+    "sqlalchemy>=2.0.30",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "pandas>=2.2",
+    "yfinance>=0.2.50",
+    "anthropic>=0.40",
+    "streamlit>=1.40",
+    "plotly>=5.24",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["market_intel*"]
+
+[tool.setuptools.package-data]
+market_intel = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: hits live external APIs (deselected by default)",
+]
+addopts = "-m 'not integration'"
