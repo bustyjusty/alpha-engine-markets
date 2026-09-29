@@ -90,14 +90,25 @@ class TestGetPriceHistory:
 
         assert len(provider.bar_calls) == 1  # marker suppressed the second sync
 
-    def test_incremental_fetch_only_missing_days(self, db: Database) -> None:
+    def test_incremental_fetch_covers_missing_days(self, db: Database) -> None:
+        """Missing days are fetched, with a short overlap over stored bars.
+
+        The overlap is deliberate: without it a stored bar could never be
+        revised, so today's price would freeze at its first intraday print and a
+        bad bar would persist for good. It stays bounded by _REFRESH_TAIL_DAYS.
+        """
         _seed_bars(db, "SPY", [_bar(6), _bar(7)])
         provider = FakeProvider(bars=[_bar(8), _bar(9)])
         service = _service(db, provider)
 
         frame = service.get_price_history("SPY", start=D(2026, 7, 6), end=D(2026, 7, 9))
 
-        assert provider.bar_calls == [("SPY", D(2026, 7, 8), D(2026, 7, 9))]
+        assert len(provider.bar_calls) == 1
+        symbol, fetched_start, fetched_end = provider.bar_calls[0]
+        assert symbol == "SPY"
+        assert fetched_end == D(2026, 7, 9)
+        assert fetched_start <= D(2026, 7, 8)  # at least the missing days
+        assert fetched_start >= D(2026, 7, 6)  # never before the requested start
         assert len(frame) == 4
 
     def test_backfill_earlier_start(self, db: Database) -> None:
@@ -107,8 +118,28 @@ class TestGetPriceHistory:
 
         frame = service.get_price_history("SPY", start=D(2026, 7, 1), end=D(2026, 7, 7))
 
-        assert provider.bar_calls == [("SPY", D(2026, 7, 1), D(2026, 7, 5))]
+        # The gap before the stored range is backfilled, and a short trailing
+        # window is always re-fetched so the most recent bars stay current.
+        assert ("SPY", D(2026, 7, 1), D(2026, 7, 5)) in provider.bar_calls
         assert [d.day for d in frame.index] == [1, 2, 6, 7]
+
+    def test_recent_bars_are_refetched_so_todays_price_updates(
+        self, db: Database
+    ) -> None:
+        """The current session's bar must not be frozen at its first print.
+
+        Fetching only missing dates would mean that once any bar exists for
+        today, no gap remains and a refresh could never update or correct it.
+        """
+        _seed_bars(db, "SPY", [_bar(6), _bar(7)])
+        provider = FakeProvider(bars=[_bar(7)])
+        service = _service(db, provider)
+
+        service.get_price_history("SPY", start=D(2026, 7, 6), end=D(2026, 7, 7))
+
+        assert provider.bar_calls, "expected a trailing re-fetch, got none"
+        fetched_end = provider.bar_calls[-1][2]
+        assert fetched_end == D(2026, 7, 7)
 
     def test_provider_failure_serves_stored_data(self, db: Database) -> None:
         _seed_bars(db, "SPY", [_bar(6), _bar(7)])

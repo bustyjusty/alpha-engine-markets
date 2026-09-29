@@ -44,7 +44,10 @@ with generate_tab:
                     title, context=context, focus=focus or None, tags=tags or None
                 )
             st.success(f"Note archived (#{note['id']}, model {note['model']})")
-            st.markdown(note["content"])
+            # Keyed container so the stylesheet restores document-scale heading
+            # typography — generated notes carry their own heading hierarchy.
+            with st.container(key="ae-prose-new"):
+                st.markdown(note["content"])
         except MarketIntelError as exc:
             st.error(f"Generation failed: {exc}")
 
@@ -70,4 +73,5 @@ with archive_tab:
             label += f"  [{note['tags']}]"
         with st.expander(label):
             st.caption(f"{note['note_type']}" + (f" · {note['model']}" if note["model"] else ""))
-            st.markdown(note["content"])
+            with st.container(key=f"ae-prose-{note['id']}"):
+                st.markdown(note["content"])

@@ -14,18 +14,18 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 # Status (gain/loss semantics) — brightened for the black terminal surface
-UP = "#16b845"
-DOWN = "#e5484d"
+UP = "#2FD98A"
+DOWN = "#FF5C6C"
 # Categorical slots (dark-surface steps)
-PRIMARY = "#3987e5"  # blue
-VWAP_COLOR = "#fb8b1e"  # terminal amber
-SMA20_COLOR = "#199e70"  # aqua
-SMA50_COLOR = "#9085e9"  # violet
-NEGATIVE = "#e66767"  # diverging warm pole
+PRIMARY = "#5AA9FF"  # blue
+VWAP_COLOR = "#C2F04A"  # terminal accent
+SMA20_COLOR = "#38D9A9"  # aqua
+SMA50_COLOR = "#B197FC"  # violet
+NEGATIVE = "#FF6B81"  # diverging warm pole
 # Chrome
-MUTED = "#898781"
-GRID = "#2c2c2a"
-BAND_FILL = "rgba(137, 135, 129, 0.12)"
+MUTED = "#79828F"
+GRID = "#1D232C"
+BAND_FILL = "rgba(138, 147, 160, 0.12)"
 
 _BASE_LAYOUT = dict(
     paper_bgcolor="rgba(0,0,0,0)",

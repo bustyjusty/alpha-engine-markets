@@ -1,9 +1,16 @@
-"""Global dashboard styling — Bloomberg-terminal look.
+"""Global dashboard styling — Alpha Engine trading-terminal look.
 
-Injected once from app.py; base colors live in .streamlit/config.toml,
-this adds the panel treatment: black surfaces, amber field labels and
-headers, hairline borders, dense tabular numerics. Green/red is reserved
-for signed values (returns, candles), never decoration.
+Injected once from the entrypoint. Colours, fonts, radii and the semantic
+palette all live in `.streamlit/config.toml`; this file only carries the
+things the theme system cannot express — uppercase micro-labels, monospace
+tabular figures, the panel treatment on stat tiles, and nav/tab chrome.
+
+Shared verbatim with semi-intel and research-intelligence. Change it in one
+place and copy, so the four apps keep reading as one product.
+
+Colour discipline: chartreuse (#C2F04A) is the only accent, reserved for
+primary actions and the active view. Green/red belong to signed values —
+returns, deltas, candles — and are never used as decoration.
 """
 
 from __future__ import annotations
@@ -12,95 +19,175 @@ import streamlit as st
 
 _CSS = """
 <style>
-/* Denser canvas: terminal layouts waste no vertical space */
+/* ── Canvas ──────────────────────────────────────────────────────────────
+   Terminal layouts waste no vertical space, but panels need room to read. */
 .block-container {
-    padding-top: 2.2rem;
-    padding-bottom: 2rem;
-    max-width: 1440px;
+    padding-top: 2.4rem;
+    padding-bottom: 3rem;
+    max-width: 1480px;
+}
+header[data-testid="stHeader"] { background: transparent; }
+
+/* ── Typography ──────────────────────────────────────────────────────────
+   One large tight title per page; every section below it is a small
+   uppercase field label, the way a terminal names its panels. */
+h1 {
+    letter-spacing: -0.025em;
+    color: #F2F5F9;
+}
+h2, h3, h4 {
+    text-transform: uppercase;
+    letter-spacing: 0.13em;
+    color: #949DAB;
+}
+[data-testid="stCaptionContainer"],
+[data-testid="stCaptionContainer"] p {
+    color: #79828F;
+    font-size: 0.8rem;
+    line-height: 1.55;
+}
+hr { border-color: #1D232C; }
+
+/* ── Long-form prose ─────────────────────────────────────────────────────
+   Rendered .md files and generated research notes carry their own heading
+   hierarchy. The uppercase field-label treatment above is meant for page
+   sections and would mangle a forty-heading document, so anything wrapped in
+   st.container(key="ae-prose...") gets ordinary document typography back. */
+[class*="st-key-ae-prose"] { max-width: 62rem; }
+[class*="st-key-ae-prose"] h1,
+[class*="st-key-ae-prose"] h2,
+[class*="st-key-ae-prose"] h3,
+[class*="st-key-ae-prose"] h4 {
+    text-transform: none;
+    letter-spacing: -0.012em;
+    color: #E7EAEF;
+}
+[class*="st-key-ae-prose"] h1 { font-size: 24px; }
+[class*="st-key-ae-prose"] h2 { font-size: 19px; }
+[class*="st-key-ae-prose"] h3 { font-size: 16px; }
+[class*="st-key-ae-prose"] p,
+[class*="st-key-ae-prose"] li {
+    line-height: 1.72;
+    color: #C4CBD5;
 }
 
-/* Stat tiles: black panels, amber field labels, white values */
+/* ── Stat tiles ──────────────────────────────────────────────────────────
+   Raised panel, hairline border, and a short accent rule along the top
+   edge that fades out — the one flourish borrowed from the reference. */
 [data-testid="stMetric"] {
-    background: #101010;
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    border-radius: 4px;
-    padding: 12px 16px;
+    position: relative;
+    overflow: hidden;
+    background: #12161C;
+    border: 1px solid #232A34;
+    border-radius: 12px;
+    padding: 14px 16px 12px;
 }
-[data-testid="stMetricLabel"] {
-    color: #fb8b1e;
-    font-size: 0.70rem;
-    letter-spacing: 0.10em;
+[data-testid="stMetric"]::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1px;
+    background: linear-gradient(90deg,
+                rgba(194, 240, 74, 0.6), rgba(194, 240, 74, 0) 62%);
+}
+[data-testid="stMetricLabel"],
+[data-testid="stMetricLabel"] * {
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
+    color: #7F8896;
 }
 [data-testid="stMetricValue"] {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
     font-variant-numeric: tabular-nums;
-    font-weight: 650;
     font-size: 1.5rem;
-    color: #f2f0eb;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #F2F5F9;
 }
 [data-testid="stMetricDelta"] {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
     font-variant-numeric: tabular-nums;
-    font-size: 0.85rem;
+    font-size: 0.78rem;
 }
 
-/* Tables and charts sit on black panels with hairline borders */
+/* Figures align wherever they appear, not just in tiles. */
 [data-testid="stDataFrame"],
-[data-testid="stPlotlyChart"] {
-    background: #0d0d0d;
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    border-radius: 4px;
-    padding: 6px;
+[data-testid="stTable"],
+[data-testid="stMetric"] { font-variant-numeric: tabular-nums; }
+
+/* ── Panels ──────────────────────────────────────────────────────────────
+   Charts get the same surface as everything else so the page reads as a
+   grid of instruments rather than floating widgets. */
+[data-testid="stPlotlyChart"],
+[data-testid="stVegaLiteChart"],
+[data-testid="stArrowVegaLiteChart"] {
+    background: #10141A;
+    border: 1px solid #1D232C;
+    border-radius: 12px;
+    padding: 8px;
 }
 
-/* Expanders and forms as flat panels */
-[data-testid="stExpander"],
-[data-testid="stForm"] {
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    border-radius: 4px;
-    background: #0d0d0d;
+/* ── Tabs: uppercase, accent underline on the active view ────────────── */
+[data-testid="stTabs"] [data-baseweb="tab-list"] {
+    gap: 1.6rem;
+    border-bottom: 1px solid #232A34;
 }
-
-/* Page titles as terminal function headers: uppercase amber */
-h1 {
-    color: #fb8b1e;
+[data-testid="stTabs"] button[role="tab"] {
+    padding: 0 0 0.55rem 0;
+    font-size: 0.76rem;
+    font-weight: 500;
+    letter-spacing: 0.11em;
     text-transform: uppercase;
-    letter-spacing: 0.10em;
-    font-weight: 700;
-    font-size: 1.25rem;
+    color: #79828F;
 }
-h2, h3 {
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
-    font-size: 1.0rem;
-    color: #d9d6cf;
+[data-testid="stTabs"] button[aria-selected="true"] { color: #F2F5F9; }
+[data-testid="stTabs"] [data-baseweb="tab-highlight"] {
+    background-color: #C2F04A;
+    height: 2px;
 }
+[data-testid="stTabs"] [data-baseweb="tab-border"] { display: none; }
 
-/* Section captions: quiet gray */
-[data-testid="stCaptionContainer"] { color: #8f8d86; }
-
-/* Tabs: amber underline on the active tab */
-[data-testid="stTabs"] button[aria-selected="true"] { color: #fb8b1e; }
-[data-testid="stTabs"] [data-baseweb="tab-highlight"] { background-color: #fb8b1e; }
-[data-testid="stTabs"] [data-baseweb="tab-border"] {
-    background-color: rgba(255, 255, 255, 0.10);
-}
-
-/* Sidebar nav: darkest surface, uppercase entries */
-[data-testid="stSidebar"] {
-    background: #050505;
-    border-right: 1px solid rgba(255, 255, 255, 0.08);
+/* ── Sidebar navigation ──────────────────────────────────────────────── */
+[data-testid="stSidebarNav"] a {
+    border-radius: 8px;
+    padding-top: 0.28rem;
+    padding-bottom: 0.28rem;
 }
 [data-testid="stSidebarNav"] a span {
+    font-size: 0.76rem;
+    font-weight: 500;
+    letter-spacing: 0.09em;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-size: 0.82rem;
+}
+[data-testid="stSidebarNav"] a[aria-current="page"] {
+    background: rgba(194, 240, 74, 0.10);
+}
+[data-testid="stSidebarNav"] a[aria-current="page"] span { color: #C2F04A; }
+
+/* ── Controls ────────────────────────────────────────────────────────────
+   The accent is bright, so primary buttons need dark text to stay legible
+   (Streamlit's default is white). */
+button[kind="primary"],
+[data-testid="stBaseButton-primary"] {
+    color: #0A0C10 !important;
+    font-weight: 600;
 }
 
-/* Numbers in tables align */
-[data-testid="stDataFrame"] * { font-variant-numeric: tabular-nums; }
-
-/* Primary buttons: amber with black text for contrast */
-button[kind="primary"] { color: #000000 !important; font-weight: 650; }
+/* ── Scrollbars: thin, neutral, out of the way ───────────────────────── */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+    background: #262E39;
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #3A4553;
+    background-clip: content-box;
+}
 </style>
 """
 

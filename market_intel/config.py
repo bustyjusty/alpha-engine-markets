@@ -29,9 +29,25 @@ class Settings(BaseSettings):
         anthropic_api_key: API key for AI-generated research summaries.
         finnhub_api_key: API key for fundamentals / earnings calendar.
         newsapi_api_key: API key for NewsAPI headlines.
-        fred_api_key: API key for FRED macroeconomic series.
+        fred_api_key: API key for FRED macroeconomic series. Optional - the FRED
+            adapter falls back to the keyless public CSV endpoint without one.
+        alphavantage_api_key: API key for Alpha Vantage daily bars.
+        alphavantage_daily_budget: Self-imposed request cap for Alpha Vantage,
+            matching the free tier's 25/day allowance.
         price_cache_ttl_minutes: How long cached price responses stay fresh.
         news_cache_ttl_minutes: How long cached news responses stay fresh.
+        recap_web_search_max_uses: Search budget for one agentic market recap.
+            Each generation may run up to this many web searches while
+            researching the day's news; higher means better sourced and slower.
+        mkr_history_days: How much daily history the MKR analysis loads. Three
+            years covers the 200-day average and gives the monthly timeframe
+            enough bars to trend.
+        mkr_horizon_days: Monte Carlo horizon for the MKR analysis.
+        mkr_monte_carlo_paths: How many paths each Monte Carlo regime simulates.
+        mkr_risk_free_rate: Annual risk-free rate used for Black-Scholes deltas
+            and option repricing. It only feeds the greeks, so a slightly
+            stale rate moves deltas in the third decimal, not the decision.
+        mkr_web_search_max_uses: Search budget for one AI-written MKR analysis.
     """
 
     model_config = SettingsConfigDict(
@@ -47,8 +63,12 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_dir: Path = Path("logs")
 
-    # Provider selection
-    market_data_provider: str = "yfinance"
+    # Provider selection.
+    #
+    # "chain" tries yfinance, then FRED, then Alpha Vantage, so one source
+    # breaking degrades the data instead of emptying it. Set this to a single
+    # adapter name ("yfinance", "fred", "alphavantage") to pin one source.
+    market_data_provider: str = "chain"
     news_provider: str = "yfinance"
     event_provider: str = "yfinance"
     etf_provider: str = "yfinance"
@@ -58,6 +78,11 @@ class Settings(BaseSettings):
     finnhub_api_key: str | None = None
     newsapi_api_key: str | None = None
     fred_api_key: str | None = None
+    alphavantage_api_key: str | None = None
+
+    # Alpha Vantage's free tier allows 25 requests/day. The adapter refuses to
+    # exceed this per process so a refresh cannot silently burn the allowance.
+    alphavantage_daily_budget: int = 25
 
     # Caching
     price_cache_ttl_minutes: int = 15
@@ -65,13 +90,25 @@ class Settings(BaseSettings):
     security_info_cache_ttl_minutes: int = 1440
     calendar_cache_ttl_minutes: int = 720
     etf_holdings_cache_ttl_minutes: int = 1440
+    fundamentals_cache_ttl_minutes: int = 360
+    options_cache_ttl_minutes: int = 30
 
     # Market data
     default_history_days: int = 365
 
     # AI research
-    ai_model: str = "claude-opus-4-8"
+    ai_model: str = "claude-opus-5"
     ai_max_tokens: int = 16000
+
+    # Global market recap
+    recap_web_search_max_uses: int = 12
+
+    # MKR 14-Framework single-name analysis
+    mkr_history_days: int = 1100
+    mkr_horizon_days: int = 90
+    mkr_monte_carlo_paths: int = 1000
+    mkr_risk_free_rate: float = 0.04
+    mkr_web_search_max_uses: int = 8
 
 
 @lru_cache(maxsize=1)

@@ -1,14 +1,66 @@
 [server]
-# Bind to loopback only: the dashboard has no authentication, so it must
-# never be reachable from other machines on the network.
+# Bind to loopback only for local runs; Streamlit Cloud passes its own
+# --server.address flag, which takes precedence over this file.
 address = "localhost"
 
 [browser]
 gatherUsageStats = false
 
+# ── Alpha Engine design system ────────────────────────────────────────────
+# Shared verbatim across alpha-engine, market-intel, semi-intel and
+# research-intelligence so the four apps read as one product. Trading-terminal
+# look: near-black cool-cast canvas, panels one step up, hairline borders,
+# a single chartreuse accent, and monospace tabular numerals for all figures.
+# Keep the [theme] block below in sync when you change any of them.
 [theme]
 base = "dark"
-primaryColor = "#fb8b1e"
-backgroundColor = "#0a0a0a"
-secondaryBackgroundColor = "#161616"
-textColor = "#e8e6e1"
+
+# Surfaces
+backgroundColor                = "#0A0C10"
+secondaryBackgroundColor       = "#13171D"
+codeBackgroundColor            = "#0E1219"
+borderColor                    = "#232A34"
+dataframeBorderColor           = "#232A34"
+dataframeHeaderBackgroundColor = "#13171D"
+
+# Accent — the only "live" colour. Primary actions, active nav, focus rings.
+# Everything else stays neutral so the data carries the emphasis.
+primaryColor = "#C2F04A"
+textColor    = "#E7EAEF"
+linkColor    = "#8FC4FF"
+
+# Semantic palette. Green/red are reserved for signed values, never decoration.
+redColor    = "#FF5C6C"
+orangeColor = "#FFA23A"
+yellowColor = "#FFD24A"
+greenColor  = "#2FD98A"
+blueColor   = "#5AA9FF"
+violetColor = "#B197FC"
+grayColor   = "#8A93A0"
+
+chartCategoricalColors = ["#C2F04A", "#5AA9FF", "#FF7A45", "#38D9A9", "#B197FC", "#FF6B81", "#FFD43B"]
+chartSequentialColors  = ["#0C1A14", "#0F2A1D", "#123B26", "#16502F", "#1B6738", "#237F41", "#2E984B", "#4EB258", "#7ACB6A", "#B6E383"]
+
+# Typography — Inter for prose, JetBrains Mono for anything numeric.
+font     = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+codeFont = "'JetBrains Mono':https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap"
+
+baseFontSize       = 14
+baseFontWeight     = 400
+codeFontSize       = "0.82rem"
+headingFontSizes   = ["28px", "16px", "13px", "12px", "11px", "11px"]
+headingFontWeights = [680, 600, 600, 600, 600, 600]
+linkUnderline      = false
+
+baseRadius        = "10px"
+buttonRadius      = "8px"
+showWidgetBorder  = true
+showSidebarBorder = true
+
+[theme.sidebar]
+backgroundColor          = "#07090C"
+secondaryBackgroundColor = "#12161C"
+codeBackgroundColor      = "#0E1219"
+borderColor              = "#1E242C"
+textColor                = "#C8CED8"
+primaryColor             = "#C2F04A"

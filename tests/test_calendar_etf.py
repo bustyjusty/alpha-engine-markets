@@ -72,11 +72,20 @@ def _wiring(db: Database):
     return settings, cache, market_data
 
 
-def _earnings(symbol: str, day: int, consensus=None, actual=None) -> CalendarEvent:
+def _earnings(symbol: str, days_ahead: int, consensus=None, actual=None) -> CalendarEvent:
+    """Build an earnings event ``days_ahead`` days from now.
+
+    Deliberately relative to the current date: an absolute date here silently
+    ages out of the ``get_upcoming`` window and the test starts failing on a
+    calendar boundary rather than on a code change.
+    """
+    scheduled = dt.datetime.now(UTC).replace(
+        hour=21, minute=0, second=0, microsecond=0
+    ) + dt.timedelta(days=days_ahead)
     return CalendarEvent(
         event_type="earnings",
         title=f"{symbol} earnings",
-        scheduled_at=dt.datetime(2026, 7, day, 21, 0, tzinfo=UTC),
+        scheduled_at=scheduled,
         symbol=symbol,
         consensus=consensus,
         actual=actual,

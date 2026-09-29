@@ -27,6 +27,10 @@ logger = logging.getLogger(__name__)
 
 _FRAME_COLUMNS = ["open", "high", "low", "close", "adj_close", "volume", "source"]
 
+#: How many trailing days to re-fetch on a sync, so the current session's bar
+#: keeps updating and provider revisions to recent bars are picked up.
+_REFRESH_TAIL_DAYS = 3
+
 
 class MarketDataService:
     """High-level access to securities and their price history."""
@@ -138,8 +142,20 @@ class MarketDataService:
         else:
             if earliest is not None and start < earliest:
                 windows.append((start, earliest - dt.timedelta(days=1)))
-            if end > latest:
-                windows.append((latest + dt.timedelta(days=1), end))
+
+            # Fetching only *missing* dates leaves stored bars frozen at their
+            # first print: today's bar would never update intraday, and a bad
+            # bar the provider later corrects (a zero-volume print with a wildly
+            # wrong close) would persist forever, since no gap remains to fill.
+            #
+            # So always re-fetch from whichever is earlier: the start of the gap,
+            # or a short trailing window. That covers new days and revisions to
+            # recent ones in a single request. Upserts make it idempotent.
+            gap_start = latest + dt.timedelta(days=1)
+            tail_start = end - dt.timedelta(days=_REFRESH_TAIL_DAYS)
+            window_start = max(start, min(gap_start, tail_start))
+            if window_start <= end:
+                windows.append((window_start, end))
 
         for window_start, window_end in windows:
             try:

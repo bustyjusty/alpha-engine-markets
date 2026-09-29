@@ -32,7 +32,7 @@ def _response(text: str, stop_reason: str = "end_turn"):
     return SimpleNamespace(
         content=[SimpleNamespace(type="text", text=text)],
         stop_reason=stop_reason,
-        model="claude-opus-4-8",
+        model="claude-opus-5",
     )
 
 
@@ -57,10 +57,10 @@ class TestGenerateNote:
         )
 
         assert note["content"].startswith("## Market Note")
-        assert note["model"] == "claude-opus-4-8"
+        assert note["model"] == "claude-opus-5"
         # Request carried the system prompt, model, and focus.
         call = client.messages.calls[0]
-        assert call["model"] == "claude-opus-4-8"
+        assert call["model"] == "claude-opus-5"
         assert "event-driven" in call["system"]
         assert "semiconductors" in call["messages"][0]["content"]
         # Archived and retrievable.

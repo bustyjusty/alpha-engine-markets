@@ -22,7 +22,9 @@ def clean_settings(monkeypatch: pytest.MonkeyPatch):
 def test_defaults(clean_settings) -> None:
     settings = clean_settings()
     assert settings.database_url == "sqlite:///data/market_intel.db"
-    assert settings.market_data_provider == "yfinance"
+    # Default is the fallback chain, not a single source - see
+    # market_intel.providers.chain for why no one free feed is enough.
+    assert settings.market_data_provider == "chain"
     assert settings.anthropic_api_key is None
     assert settings.log_dir == Path("logs")
 

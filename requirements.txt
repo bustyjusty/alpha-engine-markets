@@ -2,7 +2,12 @@ sqlalchemy>=2.0.30
 pydantic>=2.7
 pydantic-settings>=2.3
 pandas>=2.2
-yfinance>=0.2.50
+# Imported directly by the MKR frameworks (Monte Carlo, Wilder smoothing), not
+# just pulled in behind pandas — so it is declared rather than assumed.
+numpy>=1.26
+# The option-chain and fundamentals calls the MKR module makes are tested
+# against the 1.x API. 0.2.x is a different surface and was never verified.
+yfinance>=1.5,<2
 anthropic>=0.40
 streamlit>=1.40
 plotly>=5.24

@@ -45,7 +45,14 @@ def test_frame_to_bars_conversion() -> None:
 
 
 def test_registry_creates_yfinance_provider() -> None:
+    """yfinance must lead the default chain: it is the only current feed."""
     settings = Settings(_env_file=None)
+    provider = create_market_data_provider(settings)
+    assert provider.providers[0].name == "yfinance"
+
+
+def test_registry_can_still_pin_a_single_provider() -> None:
+    settings = Settings(_env_file=None, market_data_provider="yfinance")
     provider = create_market_data_provider(settings)
     assert provider.name == "yfinance"
 
