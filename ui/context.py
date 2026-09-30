@@ -33,6 +33,7 @@ from market_intel.services.recap import RecapService
 from market_intel.services.report import ReportPipeline
 from market_intel.services.research import ResearchService
 from market_intel.services.scanner import ScannerService
+from market_intel.services.security import SecurityService
 
 
 @dataclass(frozen=True)
@@ -46,6 +47,7 @@ class AppServices:
     calendar: CalendarService
     etf: EtfService
     scanner: ScannerService
+    security: SecurityService
     recap: RecapService
     mkr: MkrService
     reports: ReportPipeline
@@ -70,6 +72,10 @@ def get_services() -> AppServices:
         db, create_market_data_provider(settings), cache, settings
     )
     recap = RecapService(db, market_data, settings)
+    # One security service for the whole app: the header bar, the snapshot,
+    # the fundamentals page and the MKR analysis all read the same cached
+    # fundamentals and option chain, so they cannot disagree about a ticker.
+    security = SecurityService(market_data, settings, cache)
     news = NewsService(db, create_news_provider(settings), cache, settings, market_data)
     return AppServices(
         settings=settings,
@@ -81,8 +87,9 @@ def get_services() -> AppServices:
         ),
         etf=EtfService(db, create_etf_provider(settings), cache, settings, market_data),
         scanner=ScannerService(market_data),
+        security=security,
         recap=recap,
-        mkr=MkrService(db, market_data, settings, cache),
+        mkr=MkrService(db, market_data, settings, cache, security=security),
         reports=ReportPipeline(recap, news),
         research=ResearchService(db, settings),
         watchlists=WatchlistService(db, market_data),

@@ -5,6 +5,8 @@ network is touched.
 """
 
 import datetime as dt
+import pathlib
+import re
 
 import pytest
 from streamlit.testing.v1 import AppTest
@@ -31,15 +33,18 @@ from market_intel.services.recap import RecapService
 from market_intel.services.report import ReportPipeline
 from market_intel.services.research import ResearchService
 from market_intel.services.scanner import ScannerService
+from market_intel.services.security import SecurityService
 from market_intel.universe import AssetClass, Instrument, QuoteKind, Region
 
 PAGES = [
     "ui/pages/overview.py",
     "ui/pages/recap.py",
+    "ui/pages/calendar_page.py",
+    "ui/pages/snapshot.py",
+    "ui/pages/fundamentals.py",
     "ui/pages/mkr.py",
     "ui/pages/charts.py",
     "ui/pages/news.py",
-    "ui/pages/calendar_page.py",
     "ui/pages/scanner.py",
     "ui/pages/etf_explorer.py",
     "ui/pages/themes.py",
@@ -182,6 +187,7 @@ def fake_services(monkeypatch, small_universe):
     market_data = MarketDataService(db, FakeMarket(), cache, settings)
     recap = RecapService(db, market_data, settings)
     news = NewsService(db, FakeNews(), cache, settings, market_data)
+    security = SecurityService(market_data, settings, cache, FakeFundamentalsFeed())
     services = ui.context.AppServices(
         settings=settings,
         db=db,
@@ -190,8 +196,9 @@ def fake_services(monkeypatch, small_universe):
         calendar=CalendarService(db, FakeEvents(), cache, settings, market_data),
         etf=EtfService(db, FakeEtf(), cache, settings, market_data),
         scanner=ScannerService(market_data),
+        security=security,
         recap=recap,
-        mkr=MkrService(db, market_data, settings, cache, FakeFundamentalsFeed()),
+        mkr=MkrService(db, market_data, settings, cache, security=security),
         reports=ReportPipeline(recap, news),
         research=ResearchService(db, settings),
         watchlists=WatchlistService(db, market_data),
@@ -223,7 +230,7 @@ def test_mkr_page_runs_the_full_analysis(fake_services) -> None:
     at.run()
     assert not at.exception, at.exception
 
-    at.text_input[0].set_value("NVDA")
+    at.text_input[0].set_value("NVDA").run()
     at.button[0].click().run()
 
     assert not at.exception, at.exception
@@ -231,3 +238,60 @@ def test_mkr_page_runs_the_full_analysis(fake_services) -> None:
     assert at.dataframe
     rendered = " ".join(block.value for block in at.markdown)
     assert "SCORECARD TABLE" in rendered
+
+
+def test_snapshot_renders_performance_and_key_facts(fake_services) -> None:
+    """The orientation page must show returns and reference data, not just a chart."""
+    at = AppTest.from_file("ui/pages/snapshot.py", default_timeout=60)
+    at.run()
+    assert not at.exception, at.exception
+
+    labels = {metric.label for metric in at.metric}
+    assert {"1D", "1M", "1Y", "YTD"} <= labels  # performance strip
+    assert {"Market cap", "PEG", "Beta"} <= labels  # key facts
+
+
+def test_the_ticker_bar_loads_a_new_security(fake_services) -> None:
+    """Typing a symbol in the shared bar reloads the page against it."""
+    at = AppTest.from_file("ui/pages/snapshot.py", default_timeout=60)
+    at.run()
+    at.text_input[0].set_value("AMD").run()
+
+    assert not at.exception, at.exception
+    assert at.session_state["ae_symbol"] == "AMD"
+    assert "AMD" in " ".join(block.value for block in at.markdown)
+
+
+def test_the_ticker_bar_remembers_recent_symbols(fake_services) -> None:
+    """Switching between two names should be one click, not two retypes."""
+    at = AppTest.from_file("ui/pages/snapshot.py", default_timeout=60)
+    at.run()
+    at.text_input[0].set_value("AMD").run()
+    at.text_input[0].set_value("NVDA").run()
+
+    assert not at.exception, at.exception
+    assert at.session_state["ae_recent"][:2] == ["NVDA", "AMD"]
+    assert any(button.label == "AMD" for button in at.button)
+
+
+def test_fundamentals_page_renders_every_section(fake_services) -> None:
+    at = AppTest.from_file("ui/pages/fundamentals.py", default_timeout=60)
+    at.run()
+    assert not at.exception, at.exception
+
+    labels = {metric.label for metric in at.metric}
+    assert {"Forward P/E", "PEG"} <= labels
+    assert {"Revenue growth", "Net margin"} <= labels
+    assert {"Held by insiders", "Short % of float"} <= labels
+    assert {"Put/call (OI)", "Max pain"} <= labels
+
+
+def test_every_registered_page_is_smoke_tested() -> None:
+    """A page added to the sidebar but not to PAGES would ship unexercised."""
+    source = pathlib.Path("app.py").read_text(encoding="utf-8")
+    registered = set(re.findall(r'st\.Page\("([^"]+)"', source))
+    assert registered, "no pages found in app.py"
+    assert registered == set(PAGES), {
+        "missing from PAGES": sorted(registered - set(PAGES)),
+        "stale in PAGES": sorted(set(PAGES) - registered),
+    }

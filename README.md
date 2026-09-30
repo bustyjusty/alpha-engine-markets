@@ -21,20 +21,24 @@ market-intel/
 │   │   ├── orm.py                # SQLAlchemy 2.0 schema (dialect-portable, 12 tables)
 │   │   └── repositories/         # Only layer that touches the ORM
 │   ├── universe.py               # Cross-asset recap universe (region x asset class)
+│   ├── formatting.py             # Shared money/percent formatting (one price, one way)
 │   ├── providers/                # Adapters: yfinance, FRED, Alpha Vantage, fallback chain
 │   ├── services/                 # market data, news, calendar, ETF, scanner,
 │   │                             # AI research, watchlists, themes, journal
-│   ├── services/                 # ... plus the global market recap service
+│   ├── services/                 # ... plus the global recap and the shared
+│   │                             # single-name service (quote, fundamentals, chain)
 │   └── analysis/                 # Pure computation: returns, beta, relative-value
 │                                 # scan, recap moves, session clock, narrative,
 │                                 # MKR frameworks (fibs, FVGs, ADX, Monte Carlo)
 ├── ui/
 │   ├── context.py                # Service graph, cached per server process
+│   ├── ticker.py                 # The loaded security: shared ticker bar + state
 │   ├── figures.py                # Plotly figure builders (pure)
-│   └── pages/                    # Overview, Global Recap, MKR Framework, Charts,
-│                                 # News, Calendar, Scanner, ETF Explorer, Themes,
-│                                 # Research, Journal
-└── tests/                        # 303 tests incl. offline UI smoke tests
+│   └── pages/                    # Markets:   Overview, Global Recap, Calendar, News
+│                                 # Security:  Snapshot, Fundamentals, Charts, MKR
+│                                 # Screening: Scanner, Themes, ETF Explorer
+│                                 # Workspace: Research, Journal
+└── tests/                        # 329 tests incl. offline UI smoke tests
 ```
 
 **Dependency direction:** `ui → services → (providers, repositories, analysis) → models`.
@@ -91,6 +95,33 @@ the News/Calendar pages to collect data. AI note generation on the
 pytest                     # offline suite (fakes, no network)
 pytest -m integration      # live yfinance smoke test
 ```
+
+## Publishing
+
+The app is hosted on Streamlit Community Cloud, which rebuilds from whatever
+lands on `main`. **Pushing is deploying** — there is no separate release step,
+and no notification when a rebuild finishes or fails.
+
+```powershell
+.\publish.bat "Add the snapshot page"     # quote it; unquoted, commas vanish
+.\publish.bat "Fix a typo" --fast         # docs-only: skip the suite
+```
+
+`git add -A` already sweeps every file, so forgetting to stage something is
+not the real risk. These are, and `scripts/preflight.py` refuses to push on
+any of them:
+
+| Check | Why it matters |
+| --- | --- |
+| **Tests pass** | The site rebuilds whether or not the code works. |
+| **Every import is in requirements.txt** | A new import resolves from the local venv and then fails on Cloud. This is what shipped numpy undeclared. |
+| **No credentials in tracked files** | `origin` is public. A pushed key has to be rotated, not deleted. |
+| **No source file is gitignored** | It would silently stay on this machine. |
+
+Then confirm it actually landed. The sidebar shows a **build stamp** that
+`publish.bat` writes at push time: refresh the live site with `Ctrl+Shift+R`
+and check the timestamp matches the one the script printed. A cached page and
+a failed rebuild look identical without it.
 
 ## Global Recap
 
@@ -149,6 +180,30 @@ the same findings go to the model as established arithmetic so its effort goes i
 researching causation instead of re-deriving what the snapshot already says. If the
 model call fails, the pipeline falls back to the deterministic writer and says so
 rather than losing the report.
+
+## Information architecture
+
+The sidebar is grouped by the question being asked, not by the tool that
+answers it:
+
+| Group | Pages | Needs a ticker? |
+| --- | --- | --- |
+| **Markets** | Overview · Global Recap · Calendar · News | No — top-down |
+| **Security** | Snapshot · Fundamentals · Charts · MKR Framework | One shared ticker |
+| **Screening** | Scanner · Themes · ETF Explorer | No — finding candidates |
+| **Workspace** | Research · Journal | No — what you wrote down |
+
+The Security group is **security-first**, the way a terminal works: a ticker
+bar is pinned above every page in it, and loading a name once carries it
+across Snapshot, Fundamentals, Charts and the MKR analysis. Those four pages
+never ask for a symbol of their own. The MKR page is the one exception to
+automatic reloading — it costs several seconds and a dozen requests, so
+loading a ticker elsewhere arms it but does not run it.
+
+All four pages read one `SecurityService`, so the fundamentals and option
+chain are fetched once per ticker and cached. That is not only a speed
+decision: Yahoo's numbers move between calls, and two pages quoting different
+market caps for the same company would undermine both.
 
 ## MKR 14-Framework
 
@@ -212,7 +267,7 @@ as the recap pipeline, for the same reason.
 4. ✅ Event calendar (earnings + manual macro) + ETF constituents & exposure
 5. ✅ Analysis engine + relative-value scanner (z-scored move vs benchmark)
 6. ✅ AI research service (Anthropic API) + archive, themes, watchlists, journal
-7. ✅ Streamlit dashboard (11 pages, Plotly charts, offline smoke-tested)
+7. ✅ Streamlit dashboard (13 pages in four groups, Plotly charts, smoke-tested)
 8. ✅ Global Recap: 93-instrument cross-asset universe, session-aware snapshot,
    multi-source provider chain, and an agentic AI wrap with live web research
 9. ✅ MKR 14-Framework: single-name analysis with computed frameworks, option

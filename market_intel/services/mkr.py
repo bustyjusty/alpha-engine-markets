@@ -67,13 +67,14 @@ from market_intel.exceptions import (
     ProviderError,
     RateLimitError,
 )
+from market_intel.formatting import money_formatter
 from market_intel.providers.fundamentals import (
     Fundamentals,
     OptionQuote,
     OptionsSnapshot,
-    YFinanceFundamentalsProvider,
 )
 from market_intel.services.market_data import MarketDataService
+from market_intel.services.security import SecurityService
 
 logger = logging.getLogger(__name__)
 
@@ -409,12 +410,18 @@ class MkrService:
         cache: ApiCache | None = None,
         fundamentals_provider: Any | None = None,
         client: anthropic.Anthropic | None = None,
+        security: SecurityService | None = None,
     ) -> None:
         self._db = db
         self._market_data = market_data
         self._settings = settings
         self._cache = cache
-        self._fundamentals = fundamentals_provider or YFinanceFundamentalsProvider()
+        # The snapshot and fundamentals pages read the same two feeds. Sharing
+        # one service means one cache entry per ticker, so those pages and this
+        # analysis can never quote different numbers for the same company.
+        self._security = security or SecurityService(
+            market_data, settings, cache, fundamentals_provider
+        )
         self._client = client
 
     @property
@@ -461,15 +468,11 @@ class MkrService:
         monthly = calc.resample_ohlcv(daily, "ME")
 
         report("Fetching intraday bars...")
-        intraday = self._safe(
-            lambda: self._fundamentals.get_intraday(symbol),
-            "4-hour fair value gaps",
-            unavailable,
-        )
+        intraday = self._security.get_intraday(symbol, unavailable)
         report("Fetching fundamentals...")
-        fundamentals = self._cached_fundamentals(symbol, unavailable)
+        fundamentals = self._security.get_fundamentals(symbol, unavailable)
         report("Fetching option chain...")
-        chain = self._cached_options(symbol, unavailable)
+        chain = self._security.get_options(symbol, unavailable)
 
         report("Running the frameworks...")
         pivots = calc.find_pivots(daily)
@@ -1285,56 +1288,6 @@ class MkrService:
             self._client = anthropic.Anthropic(api_key=self._settings.anthropic_api_key)
         return self._client
 
-    def _safe(
-        self, call: Callable[[], Any], label: str, unavailable: list[str]
-    ) -> Any | None:
-        """Run an optional enrichment, recording failure instead of raising."""
-        try:
-            return call()
-        except MarketIntelError as exc:
-            logger.info("%s unavailable: %s", label, exc)
-            unavailable.append(f"{label} ({exc})")
-        except Exception as exc:  # noqa: BLE001 - an optional feed must never break the run
-            logger.warning("%s failed unexpectedly: %s", label, exc)
-            unavailable.append(f"{label} (unexpected error)")
-        return None
-
-    def _cached_fundamentals(
-        self, symbol: str, unavailable: list[str]
-    ) -> Fundamentals | None:
-        key = f"mkr_fundamentals:{symbol}"
-        if self._cache is not None:
-            cached = self._cache.get(key)
-            if cached is not None:
-                return Fundamentals.from_payload(cached)
-        result = self._safe(
-            lambda: self._fundamentals.get_fundamentals(symbol),
-            "fundamentals",
-            unavailable,
-        )
-        if result is not None and self._cache is not None:
-            self._cache.set(
-                key, result.to_payload(), self._settings.fundamentals_cache_ttl_minutes
-            )
-        return result
-
-    def _cached_options(
-        self, symbol: str, unavailable: list[str]
-    ) -> OptionsSnapshot | None:
-        key = f"mkr_options:{symbol}"
-        if self._cache is not None:
-            cached = self._cache.get(key)
-            if cached is not None:
-                return OptionsSnapshot.from_payload(cached)
-        result = self._safe(
-            lambda: self._fundamentals.get_options(symbol), "option chain", unavailable
-        )
-        if result is not None and self._cache is not None:
-            self._cache.set(
-                key, result.to_payload(), self._settings.options_cache_ttl_minutes
-            )
-        return result
-
 
 # --- Rendering ----------------------------------------------------------------
 
@@ -1998,39 +1951,6 @@ def _horizon(a: MkrAnalysis) -> int:
         if result:
             return result.horizon_days
     return 0
-
-
-#: Currency codes to the symbol traders actually write.
-_CURRENCY_SYMBOLS = {
-    "USD": "$", "EUR": "\u20ac", "GBP": "\u00a3", "GBp": "GBp ", "JPY": "\u00a5",
-    "CNY": "\u00a5", "HKD": "HK$", "AUD": "A$", "CAD": "C$", "CHF": "CHF ",
-    "SEK": "SEK ", "KRW": "\u20a9", "TWD": "NT$", "INR": "\u20b9", "SGD": "S$",
-}
-
-
-def money_formatter(
-    reference: float, currency: str | None = None
-) -> Callable[[float | None], str]:
-    """Pick a decimal precision and a currency mark, then stick to both.
-
-    A 4-unit stock and a 4,000-point index need different precision; choosing
-    once per report keeps every level comparable. The currency comes from the
-    security's own reference data — stamping "$" on an Amsterdam listing is the
-    kind of error that reads as a rounding difference until it costs money. When
-    the currency is unknown the numbers are printed bare rather than guessed.
-    """
-    decimals = 4 if reference < 1 else 3 if reference < 10 else 2
-    if currency is None:
-        mark = ""
-    else:
-        mark = _CURRENCY_SYMBOLS.get(currency, f"{currency} ")
-
-    def render(value: float | None) -> str:
-        if value is None:
-            return "n/a"
-        return f"{mark}{value:,.{decimals}f}"
-
-    return render
 
 
 def _pair(first: float | None, second: float | None) -> str | None:

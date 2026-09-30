@@ -12,6 +12,7 @@ import streamlit as st
 from market_intel.exceptions import MarketIntelError
 from market_intel.services.mkr import MkrAnalysis, money_formatter, render_report
 from ui.context import get_services
+from ui.ticker import security_bar
 
 services = get_services()
 
@@ -21,6 +22,7 @@ st.caption(
     "greeks, the Monte Carlo. The model is only asked for the judgement calls, "
     "and only with the numbers in front of it."
 )
+symbol = security_bar(services)
 
 _ANALYSIS_KEY = "mkr_analysis"
 _WRITEUP_KEY = "mkr_writeup"
@@ -46,24 +48,10 @@ def _run(symbol: str) -> MkrAnalysis:
 
 # --- Input --------------------------------------------------------------------
 
-with st.form("mkr_run"):
-    symbol_col, button_col = st.columns([3, 1], vertical_alignment="bottom")
-    with symbol_col:
-        symbol = st.text_input(
-            "Ticker",
-            value=st.session_state.get("mkr_last_symbol", "NVDA"),
-            placeholder="e.g. NVDA, SNDK, ASML.AS",
-            help=(
-                "Any symbol the data chain can price. US single names get the full "
-                "options and fundamentals picture; indices and futures will show "
-                "those sections as unavailable."
-            ),
-        ).strip().upper()
-    with button_col:
-        run = st.form_submit_button("Run analysis", type="primary", width="stretch")
-
-if run and symbol:
-    st.session_state["mkr_last_symbol"] = symbol
+# The ticker comes from the shared bar, but the run stays explicit: this is the
+# one page that costs several seconds and a dozen requests, so loading a symbol
+# elsewhere must not silently kick it off.
+if st.button(f"Run analysis on {symbol}", type="primary"):
     try:
         _run(symbol)
     except MarketIntelError as exc:
@@ -71,8 +59,16 @@ if run and symbol:
 
 analysis: MkrAnalysis | None = st.session_state.get(_ANALYSIS_KEY)
 if analysis is None:
-    st.info("Enter a ticker and run the analysis to populate the frameworks.")
+    st.info(
+        f"Run the analysis to populate the fourteen frameworks for {symbol}."
+    )
     st.stop()
+
+if analysis.symbol != symbol:
+    st.warning(
+        f"Showing the last run, **{analysis.symbol}**. Run the analysis again to "
+        f"switch to {symbol}."
+    )
 
 # One formatter for the page, matching the report: same precision, same currency.
 money = money_formatter(analysis.price, analysis.currency)

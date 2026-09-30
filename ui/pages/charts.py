@@ -8,16 +8,17 @@ from market_intel.analysis import bollinger, rolling_twap, rolling_vwap, rsi, sm
 from market_intel.exceptions import MarketIntelError
 from ui.context import get_services
 from ui.figures import price_figure
+from ui.ticker import security_bar
 
 services = get_services()
 
 st.title("Charts")
+symbol = security_bar(services)
 
-controls = st.columns([2, 2, 4])
-symbol = controls[0].text_input("Symbol", value="SPY").strip().upper()
-lookback = controls[1].selectbox("Lookback", ["3M", "6M", "1Y", "2Y"], index=2)
+controls = st.columns([2, 6])
+lookback = controls[0].selectbox("Lookback", ["3M", "6M", "1Y", "2Y"], index=2)
 days = {"3M": 92, "6M": 183, "1Y": 365, "2Y": 730}[lookback]
-with controls[2]:
+with controls[1]:
     indicator_picks = st.multiselect(
         "Indicators",
         ["VWAP (20)", "TWAP (20)", "SMA 20", "SMA 50", "Bollinger (20, 2σ)", "RSI (14)"],
